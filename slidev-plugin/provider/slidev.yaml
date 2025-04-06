@@ -1,0 +1,15 @@
+identity:
+  author: drfu
+  name: slidev
+  label:
+    en_US: slidev
+    zh_Hans: slidev
+  description:
+    en_US: create ppt by slidev
+    zh_Hans: 使用slidev创建ppt
+  icon: icon.svg
+tools:
+  - tools/slidev-ppt.yaml
+extra:
+  python:
+    source: provider/slidev.py

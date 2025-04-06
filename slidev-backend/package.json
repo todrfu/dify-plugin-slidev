@@ -1,0 +1,23 @@
+{
+  "name": "slidev-backend",
+  "version": "0.0.1",
+  "description": "dify plugin for slidev",
+  "private": true,
+  "scripts": {
+    "start": "pnpm -C packages/slidev-node start",
+    "build": "pnpm -C packages/slidev-node build",
+    "change": "changeset",
+    "change:version": "changeset version",
+    "change:publish": "changeset publish"
+  },
+  "keywords": [],
+  "packageManager": "pnpm@10.4.1",
+  "author": "todrfu",
+  "license": "ISC",
+  "devDependencies": {
+    "@changesets/cli": "^2.26.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

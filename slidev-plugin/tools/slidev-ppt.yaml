@@ -1,0 +1,36 @@
+identity:
+  name: slidev-ppt
+  author: drfu
+  label:
+    en_US: slidev-ppt
+    zh_Hans: slidev-ppt
+description:
+  human:
+    en_US: create ppt by slidev
+    zh_Hans: 使用slidev生成ppt
+  llm: create ppt by slidev
+parameters:
+  - name: markdown
+    type: string
+    required: true
+    label:
+      en_US: Markdown Content
+      zh_Hans: Markdown 内容
+    human_description:
+      en_US: The markdown content to convert to PPT
+      zh_Hans: 需要转换为PPT的Markdown内容
+    llm_description: The markdown content that will be converted into a PPT presentation
+    form: llm
+  - name: service_url
+    type: string
+    required: true
+    label:
+      en_US: Slidev Service URL
+      zh_Hans: Slidev服务地址
+    human_description:
+      en_US: The Slidev service URL
+      zh_Hans: 生成PPT的Slidev服务接口地址
+    form: llm
+extra:
+  python:
+    source: tools/slidev-ppt.py
