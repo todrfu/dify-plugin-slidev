@@ -38,5 +38,7 @@ Slidev PPT生成工具是一个Dify插件，可以将Markdown格式的内容一�
 2. 网络环境能够正常连接到指定的service_url
 3. Dify平台已正确配置插件权限
 
+## 插件安装
+本地插件安装失败参考官方文档：[插件安装常见问题](https://docs.dify.ai/zh-hans/plugins/faq)
 
 

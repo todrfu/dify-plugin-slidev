@@ -1,6 +1,6 @@
 version: 0.0.1
 type: plugin
-author: drfu
+author: todrfu
 name: slidev
 label:
   en_US: slidev

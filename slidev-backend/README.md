@@ -24,6 +24,23 @@
 - Node.js >= 20
 - pnpm >= 10.4.1
 
+### 环境变量配置
+
+项目使用.env文件进行配置，您可以复制.env.example文件并重命名为.env，然后根据需要修改配置：
+
+```bash
+# 复制环境变量示例文件
+cp packages/slidev-node/.env.example packages/slidev-node/.env
+```
+
+以下是可配置的环境变量：
+
+| 变量名 | 说明 | 默认值 |
+| --- | --- | --- |
+| PORT | 服务端口 | 3000 |
+| MAX_CONCURRENT_TASKS | 最大并发处理任务数 | 2 |
+| TEMP_DIR | 临时文件目录名 | temp |
+
 ### 安装依赖
 
 ```bash
@@ -38,7 +55,7 @@ pnpm install
 pnpm start
 ```
 
-服务默认运行在 http://localhost:3000
+服务默认运行在 http://localhost:3000（或您在环境变量中配置的端口）
 
 ## API使用指南
 

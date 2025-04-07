@@ -23,8 +23,9 @@ export class SlidevController {
       }
       const dateYMD = new Date().toLocaleDateString().replace(/\//g, '-')
       const filename = title ? `${title}.pptx` : `slidev-${dateYMD}.pptx`
+      const requestId = res.getHeader('X-Request-Id') as string
 
-      const pptxBuffer = await this.slidevService.generatePpt(markdown, filename)
+      const pptxBuffer = await this.slidevService.generatePpt(markdown, filename, requestId)
 
       /**
        * office文件所对应的的 Content-type类型总结
