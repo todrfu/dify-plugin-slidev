@@ -21,6 +21,14 @@ export class SlidevController {
           message: '请提供markdown内容',
         })
       }
+
+      // 打印收到的markdown内容的前100个字符（调试用）
+      const previewLength = 100;
+      const markdownPreview = markdown.length > previewLength
+        ? `${markdown.substring(0, previewLength)}...`
+        : markdown;
+      console.log(`收到markdown内容（预览）: ${JSON.stringify(markdownPreview)}`);
+
       const dateYMD = new Date().toLocaleDateString().replace(/\//g, '-')
       const filename = title ? `${title}.pptx` : `slidev-${dateYMD}.pptx`
       const requestId = res.getHeader('X-Request-Id') as string
