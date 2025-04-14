@@ -31,6 +31,67 @@ parameters:
       en_US: The Slidev service URL
       zh_Hans: 生成PPT的Slidev服务接口地址
     form: llm
+  - name: export_format
+    type: select
+    required: true
+    label:
+      en_US: Format
+      zh_Hans: 格式
+    human_description:
+      en_US: The format of the PPT
+      zh_Hans: Slidev 支持多种导出格式，包括 PPTX、PDF、PNG 和 Markdown。
+    form: form
+    default: pptx
+    options:
+      - value: pptx
+        label:
+          en_US: PPT
+          zh_Hans: PPT
+      - value: pdf
+        label:
+          en_US: PDF
+          zh_Hans: PDF
+  - name: with_toc
+    type: boolean
+    label:
+      en_US: With TOC
+      zh_Hans: PDF是否生成大纲
+    human_description:
+      en_US: Whether to include a table of contents
+      zh_Hans: 可以通过传递 --with-toc 选项来生成 PDF 大纲
+    form: form
+    default: false
+  - name: omit_background
+    type: boolean
+    label:
+      en_US: Omit Background
+      zh_Hans: 是否忽略背景
+    human_description:
+      en_US: Whether to omit the background for png
+      zh_Hans: 导出为 PNG 时，可以开启该选项来移除默认的浏览器背景
+    form: form
+    default: false
+  - name: with_clicks
+    type: boolean
+    label:
+      en_US: With Clicks
+      zh_Hans: 是否包含点击
+    human_description:
+      en_US: Whether to include clicks
+      zh_Hans: 默认情况下，Slidev 会将每张幻灯片导出为一页，并禁用点击动画。如果你想将包含多步的幻灯片导出为多页，请开启该选项。
+    form: form
+    default: false
+  - name: dark_mode
+    type: boolean
+    label:
+      en_US: Dark Mode
+      zh_Hans: 是否为暗黑模式
+    human_description:
+      en_US: Whether to use dark mode
+      zh_Hans: 如果您想使用主题的深色版本导出，请开启该选项。
+    form: form
+    default: false
+      
 extra:
   python:
     source: tools/slidev-ppt.py

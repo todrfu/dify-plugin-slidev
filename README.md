@@ -2,7 +2,7 @@
 
 一个基于 [Slidev](https://cn.sli.dev/guide/) 的 Dify 平台插件，可以将 Markdown 内容一键转换为 PPT 演示文稿。
 
-![demo](./demo.png)
+![demo](./demo.gif)
 
 ## 项目概述
 
@@ -13,7 +13,7 @@
 本项目包含以下主要组件：
 
 - **slidev-plugin**: Dify 插件的 Python 实现，提供与 Dify 平台的集成
-  - **tools/slidev-ppt**: 生成PPT
+  - **tools/slidev-ppt**: 支持生成PPT✔️ / PDF✔️ / PNG 🕑 / MD 🕑
 - **slidev-backend**: 基于 NestJS 的后端服务，提供 API 接口用于处理 PPT 的生成
   - **packages/slidev-node**: 基于NestJS的后端服务，提供API接口
   - **packages/slidev-client**: 基于 Slidev 的前端部分，负责演示文稿的渲染和导出

@@ -4,6 +4,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { RequestParams } from '../types/slidev';
 
 const execPromise = promisify(exec);
 const writeFilePromise = promisify(fs.writeFile);
@@ -120,11 +121,28 @@ export class SlidevService {
    * @param markdown markdown内容
    * @param filename 文件名
    */
-  async generatePpt(markdown: string, filename: string, requestId: string): Promise<Buffer> {
+  async generatePpt(params: RequestParams, requestId: string): Promise<Buffer> {
     console.log(`[${requestId}] 收到生成PPT请求，等待处理...`);
+    const {
+      markdown,
+      filename,
+      export_format = 'pptx',
+      with_toc = false,
+      omit_background = false,
+      with_clicks = false,
+      dark_mode = false,
+    } = params
 
     // 将任务添加到队列中，避免过多并发请求
-    return this.requestQueue.add(() => this.processPptRequest(markdown, filename, requestId), requestId);
+    return this.requestQueue.add(() => this.processPptRequest({
+      markdown,
+      filename,
+      export_format,
+      with_toc,
+      omit_background,
+      with_clicks,
+      dark_mode,
+    }, requestId), requestId);
   }
 
   /**
@@ -133,7 +151,8 @@ export class SlidevService {
    * @param filename 文件名
    * @param requestId 请求ID
    */
-  private async processPptRequest(markdown: string, filename: string, requestId: string): Promise<Buffer> {
+  private async processPptRequest(params: RequestParams, requestId: string): Promise<Buffer> {
+    const { markdown, filename, export_format, with_toc, omit_background, with_clicks, dark_mode } = params
     // 在独立的目录中执行slidev命令
     const clientDir = path.resolve(process.cwd(), '..', 'slidev-client');
     // 通过请求ID创建独立的工作目录，避免资源冲突
@@ -155,15 +174,40 @@ export class SlidevService {
       console.log(`[${requestId}] Markdown内容已写入: ${slidesFile}`);
 
       // 导出文件路径
-      const outputFile = path.join(workDir, `${filename}.pptx`);
+
+      // 提取后缀
+      const ext = {
+        'pptx': 'pptx',
+        'pdf': 'pdf',
+        'png': 'png',
+        'markdown': 'md',
+      }
+
+      const outputFile = path.join(workDir, `${filename}.${ext[export_format]}`);
+      const exportParams = []
+      if (export_format) {
+        exportParams.push(`--format ${export_format}`)
+      }
+      if (with_toc) {
+        exportParams.push('--with-toc')
+      }
+      if (omit_background) {
+        exportParams.push('--omit-background')
+      }
+      if (with_clicks) {
+        exportParams.push('--with-clicks')
+      }
+      if (dark_mode) {
+        exportParams.push('--dark')
+      }
 
       // 执行Slidev导出命令
       try {
-        console.log(`[${requestId}] 开始导出PPT`);
+        console.log(`[${requestId}] 开始导出`);
 
         // 使用绝对路径执行slidev命令，避免路径问题
         const { stdout, stderr } = await execPromise(
-          `npx slidev export "${slidesFile}" --format pptx --output "${outputFile}"`,
+          `npx slidev export "${slidesFile}" ${exportParams.join(' ')} --output "${outputFile}"`,
           { cwd: clientDir }
         );
 
@@ -175,7 +219,7 @@ export class SlidevService {
           throw new Error(`导出文件未生成: ${outputFile}`);
         }
 
-        console.log(`[${requestId}] PPT导出成功: ${outputFile}`);
+        console.log(`[${requestId}] 文件导出成功: ${outputFile}`);
 
         // 读取生成的PPT文件
         const pptBuffer = await readFilePromise(outputFile);
