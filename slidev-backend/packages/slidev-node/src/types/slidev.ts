@@ -3,6 +3,7 @@ export interface RequestParams {
   title?: string
   filename?: string
   export_format?: string
+  theme?: string
   with_toc?: boolean
   omit_background?: boolean
   with_clicks?: boolean

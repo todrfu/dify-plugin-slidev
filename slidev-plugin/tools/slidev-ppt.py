@@ -97,15 +97,6 @@ class SlidevPPTTool(Tool):
                 "status": "error"
             })
             return
-        elif export_format == 'png':
-            yield self.create_json_message({
-                "error": {
-                    "zh_Hans": "不支持导出为 PNG 格式",
-                    "en": "PNG export is not supported"
-                },
-                "status": "error"
-            })
-            return
             
         self.service_url = tool_parameters.get("service_url", None)
         if self.service_url is None:
@@ -124,9 +115,9 @@ class SlidevPPTTool(Tool):
                 }
                 export_format = tool_parameters.get("export_format", None)
                 if export_format == 'md':
-                    meta["mime_type"] = "text/markdown"
+                    meta["mime_type"] = "application/zip"
                 elif export_format == 'png':
-                    meta["mime_type"] = "image/png"
+                    meta["mime_type"] = "application/zip"
                 elif export_format == 'pdf':
                     meta["mime_type"] = "application/pdf"
                 elif export_format == 'pptx':

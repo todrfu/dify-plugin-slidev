@@ -17,8 +17,8 @@ parameters:
       en_US: Markdown Content
       zh_Hans: Markdown 内容
     human_description:
-      en_US: The markdown content to convert to PPT
-      zh_Hans: 需要转换为PPT的Markdown内容
+      en_US: The markdown content that will be converted into a PPT presentation
+      zh_Hans: 符合slidev语法的markdown内容
     llm_description: The markdown content that will be converted into a PPT presentation
     form: llm
   - name: service_url
@@ -30,7 +30,7 @@ parameters:
     human_description:
       en_US: The Slidev service URL
       zh_Hans: 生成PPT的Slidev服务接口地址
-    form: llm
+    form: form
   - name: export_format
     type: select
     required: true
@@ -51,31 +51,48 @@ parameters:
         label:
           en_US: PDF
           zh_Hans: PDF
+      - value: png
+        label:
+          en_US: PNG
+          zh_Hans: PNG
+      - value: md
+        label:
+          en_US: Markdown
+          zh_Hans: Markdown
+  - name: theme
+    type: string
+    label:
+      en_US: Theme
+      zh_Hans: PPT主题
+    human_description:
+      en_US: The theme of the PPT, theme list https://cn.sli.dev/resources/theme-gallery
+      zh_Hans: PPT的主题风格，主题列表 https://cn.sli.dev/resources/theme-gallery
+    form: llm
   - name: with_toc
     type: boolean
     label:
       en_US: With TOC
-      zh_Hans: PDF是否生成大纲
+      zh_Hans: 生成PDF大纲
     human_description:
       en_US: Whether to include a table of contents
-      zh_Hans: 可以通过传递 --with-toc 选项来生成 PDF 大纲
+      zh_Hans: 当导出格式为PDF时，可通过该选项控制是否生成PDF大纲
     form: form
     default: false
   - name: omit_background
     type: boolean
     label:
       en_US: Omit Background
-      zh_Hans: 是否忽略背景
+      zh_Hans: 忽略PNG背景
     human_description:
       en_US: Whether to omit the background for png
-      zh_Hans: 导出为 PNG 时，可以开启该选项来移除默认的浏览器背景
+      zh_Hans: 导出为PNG时，可以开启该选项来移除默认的浏览器背景
     form: form
     default: false
   - name: with_clicks
     type: boolean
     label:
       en_US: With Clicks
-      zh_Hans: 是否包含点击
+      zh_Hans: 导出动画步骤
     human_description:
       en_US: Whether to include clicks
       zh_Hans: 默认情况下，Slidev 会将每张幻灯片导出为一页，并禁用点击动画。如果你想将包含多步的幻灯片导出为多页，请开启该选项。
@@ -85,13 +102,12 @@ parameters:
     type: boolean
     label:
       en_US: Dark Mode
-      zh_Hans: 是否为暗黑模式
+      zh_Hans: 暗黑模式
     human_description:
       en_US: Whether to use dark mode
       zh_Hans: 如果您想使用主题的深色版本导出，请开启该选项。
     form: form
     default: false
-      
 extra:
   python:
     source: tools/slidev-ppt.py

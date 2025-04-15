@@ -5,236 +5,82 @@ import { promisify } from 'util';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RequestParams } from '../types/slidev';
+import { ZipUtil } from '../utils/zip';
+import { TaskQueue } from '../utils/task-queue';
+import { parseMarkdownString } from '../utils/parse-markdown-string';
+import { ensureDirectoryExists, deleteDir } from '../utils/file';
+import { checkPackageInstalled, installPackage } from '../utils/package';
 
 const execPromise = promisify(exec);
 const writeFilePromise = promisify(fs.writeFile);
 const readFilePromise = promisify(fs.readFile);
-const mkdirPromise = promisify(fs.mkdir);
-const existsPromise = promisify(fs.exists);
-const unlinkPromise = promisify(fs.unlink);
-const rmdirPromise = promisify(fs.rmdir);
-
-// 请求队列管理类
-class RequestQueue {
-  private queue: Array<{
-    resolve: (value: any) => void;
-    reject: (error: Error) => void;
-    task: () => Promise<any>;
-    id: string;
-  }> = [];
-  private runningTasks = 0;
-  private maxConcurrent: number;
-
-  constructor(maxConcurrent = 2) {
-    this.maxConcurrent = maxConcurrent;
-  }
-
-  // 添加任务到队列
-  add(task: () => Promise<any>, id: string): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.queue.push({ resolve, reject, task, id });
-      this.processQueue();
-    });
-  }
-
-  // 处理队列中的任务
-  private processQueue() {
-    if (this.runningTasks >= this.maxConcurrent || this.queue.length === 0) {
-      return;
-    }
-
-    const { resolve, reject, task, id } = this.queue.shift();
-    this.runningTasks++;
-
-    console.log(`[${id}] 开始执行队列中的任务，当前运行任务数: ${this.runningTasks}`);
-
-    task()
-      .then((result) => {
-        resolve(result);
-        console.log(`[${id}] 任务成功完成`);
-      })
-      .catch((error) => {
-        reject(error);
-        console.error(`[${id}] 任务执行失败:`, error);
-      })
-      .finally(() => {
-        this.runningTasks--;
-        console.log(`[${id}] 任务结束，当前运行任务数: ${this.runningTasks}，队列中剩余任务: ${this.queue.length}`);
-        this.processQueue();
-      });
-  }
-}
 
 @Injectable()
 export class SlidevService {
-  // 创建请求队列，最大并发数设为2（可根据服务器性能调整）
-  private requestQueue: RequestQueue;
+  private taskQueue: TaskQueue;
   private tempDir: string;
+  private clientDir: string;
 
   constructor(private configService: ConfigService) {
-    // 从配置中读取最大并发数
     const maxConcurrentTasks = this.configService.get<number>('MAX_CONCURRENT_TASKS', 2);
-    this.requestQueue = new RequestQueue(maxConcurrentTasks);
-    // 从配置中读取临时目录
+    this.taskQueue = new TaskQueue(maxConcurrentTasks);
     this.tempDir = this.configService.get<string>('TEMP_DIR', 'temp');
-  }
-
-  /**
-   * 创建目录
-   * @param dir 目录路径
-   */
-  async mkdir(dir: string) {
-    const exists = await existsPromise(dir);
-    if (!exists) {
-      await mkdirPromise(dir, { recursive: true });
-    }
-  }
-
-  /**
-   * 清理临时文件和目录
-   * @param files 文件路径数组
-   * @param dirs 目录路径数组
-   */
-  async cleanup(files: string[] = [], dirs: string[] = []) {
-    try {
-      // 删除临时文件
-      for (const file of files) {
-        if (await existsPromise(file)) {
-          await unlinkPromise(file);
-        }
-      }
-
-      // 删除临时目录
-      for (const dir of dirs) {
-        if (await existsPromise(dir)) {
-          await rmdirPromise(dir, { recursive: true });
-        }
-      }
-    } catch (error) {
-      console.error('清理临时文件失败:', error);
-      // 清理失败不影响主流程
-    }
+    this.clientDir = path.resolve(process.cwd(), '..', 'slidev-client');
   }
 
   /**
    * 生成PPT
-   * @param markdown markdown内容
-   * @param filename 文件名
+   * @param params 请求参数
+   * @param requestId 请求ID
    */
   async generatePpt(params: RequestParams, requestId: string): Promise<Buffer> {
     console.log(`[${requestId}] 收到生成PPT请求，等待处理...`);
-    const {
-      markdown,
-      filename,
-      export_format = 'pptx',
-      with_toc = false,
-      omit_background = false,
-      with_clicks = false,
-      dark_mode = false,
-    } = params
 
     // 将任务添加到队列中，避免过多并发请求
-    return this.requestQueue.add(() => this.processPptRequest({
-      markdown,
-      filename,
-      export_format,
-      with_toc,
-      omit_background,
-      with_clicks,
-      dark_mode,
-    }, requestId), requestId);
+    return this.taskQueue.add(() => this.processPptRequest(params, requestId), requestId);
   }
 
   /**
    * 处理单个PPT生成请求
-   * @param markdown markdown内容
-   * @param filename 文件名
+   * @param params 请求参数
    * @param requestId 请求ID
    */
   private async processPptRequest(params: RequestParams, requestId: string): Promise<Buffer> {
-    const { markdown, filename, export_format, with_toc, omit_background, with_clicks, dark_mode } = params
-    // 在独立的目录中执行slidev命令
-    const clientDir = path.resolve(process.cwd(), '..', 'slidev-client');
-    // 通过请求ID创建独立的工作目录，避免资源冲突
-    const workDir = path.join(clientDir, this.tempDir, requestId);
+    const { markdown, filename, export_format, theme } = params;
+    const workDir = this.createWorkDir(requestId);
 
     try {
-      // 确保目录存在
-      await this.mkdir(workDir);
-
+      // 确保工作目录存在
+      await ensureDirectoryExists(workDir);
       console.log(`[${requestId}] 开始处理请求，文件名: ${filename}`);
 
-      // 写入Markdown到临时文件
-      const slidesFile = path.join(workDir, `${filename}.md`);
-
-      // 解析markdown中的转义字符（如\n换行符等）
-      const parsedMarkdown = this.parseMarkdownString(markdown);
-
-      await writeFilePromise(slidesFile, parsedMarkdown);
-      console.log(`[${requestId}] Markdown内容已写入: ${slidesFile}`);
-
-      // 导出文件路径
-
-      // 提取后缀
-      const ext = {
-        'pptx': 'pptx',
-        'pdf': 'pdf',
-        'png': 'png',
-        'markdown': 'md',
+      // 如果指定了主题，确保主题已安装
+      if (theme) {
+        await this.ensureThemeInstalled(theme, requestId);
       }
 
-      const outputFile = path.join(workDir, `${filename}.${ext[export_format]}`);
-      const exportParams = []
-      if (export_format) {
-        exportParams.push(`--format ${export_format}`)
-      }
-      if (with_toc) {
-        exportParams.push('--with-toc')
-      }
-      if (omit_background) {
-        exportParams.push('--omit-background')
-      }
-      if (with_clicks) {
-        exportParams.push('--with-clicks')
-      }
-      if (dark_mode) {
-        exportParams.push('--dark')
-      }
+      // 创建并写入Markdown文件
+      const slidesFilePath = await this.createMarkdownFile(workDir, filename, markdown);
 
-      // 执行Slidev导出命令
-      try {
-        console.log(`[${requestId}] 开始导出`);
+      // 格式化markdown
+      await this.formatMarkdownFile(slidesFilePath);
 
-        // 使用绝对路径执行slidev命令，避免路径问题
-        const { stdout, stderr } = await execPromise(
-          `npx slidev export "${slidesFile}" ${exportParams.join(' ')} --output "${outputFile}"`,
-          { cwd: clientDir }
-        );
+      // 执行导出操作
+      const outputPath = await this.exportPresentation(
+        slidesFilePath,
+        workDir,
+        filename,
+        params
+      );
 
-        if (stdout) console.log(`[${requestId}] 导出输出: ${stdout}`);
-        if (stderr) console.error(`[${requestId}] 导出错误: ${stderr}`);
-
-        // 验证输出文件是否存在
-        if (!await existsPromise(outputFile)) {
-          throw new Error(`导出文件未生成: ${outputFile}`);
-        }
-
-        console.log(`[${requestId}] 文件导出成功: ${outputFile}`);
-
-        // 读取生成的PPT文件
-        const pptBuffer = await readFilePromise(outputFile);
-
-        return pptBuffer;
-      } catch (execError) {
-        console.error(`[${requestId}] 执行导出命令失败:`, execError);
-        throw new Error(`执行导出命令失败: ${execError.message}`);
-      }
+      // 读取并返回生成的文件
+      return await this.readExportResult(outputPath, workDir, filename, export_format);
     } catch (error) {
       console.error(`[${requestId}] 生成PPT时出错:`, error);
       throw error;
     } finally {
-      // 请求处理完成后清理临时文件
-      this.cleanup([], [workDir]).catch(err => {
+      // 清理临时文件
+      deleteDir([workDir]).catch(err => {
         console.error(`[${requestId}] 清理临时文件失败:`, err);
       });
       console.log(`[${requestId}] 请求处理完成`);
@@ -242,31 +88,206 @@ export class SlidevService {
   }
 
   /**
-   * 解析Markdown字符串中的转义字符
-   * @param markdownString 包含转义字符的markdown字符串
-   * @returns 解析后的markdown内容
+   * 确保主题已安装
+   * @param theme 主题名称
+   * @param requestId 请求ID
    */
-  private parseMarkdownString(markdownString: string): string {
-    // 如果输入是JSON字符串格式（带双引号），先尝试使用JSON.parse解析
-    if (markdownString.startsWith('"') && markdownString.endsWith('"')) {
-      try {
-        return JSON.parse(`{"content":${markdownString}}`).content;
-      } catch (e) {
-        console.log('JSON解析失败，将直接处理转义字符');
-      }
+  private async ensureThemeInstalled(theme: string, requestId: string): Promise<void> {
+    // 转换主题名为包名
+    const packageName = this.getThemePackageName(theme);
+
+    try {
+      // 检查主题包是否已安装
+      await checkPackageInstalled(packageName, this.clientDir);
+      console.log(`[${requestId}] 主题 "${packageName}" 已安装`);
+    } catch (error) {}
+    try {
+      // 主题未安装，自动安装
+      console.log(`[${requestId}] 主题 "${packageName}" 未安装，开始自动安装...`);
+      await installPackage(packageName, this.clientDir);
+    } catch (error) {
+      console.error(`[${requestId}] 安装主题包失败:`, error);
+    }
+  }
+
+  /**
+   * 获取主题的包名
+   * @param theme 主题名称
+   * @returns 完整的npm包名
+   */
+  private getThemePackageName(theme: string): string {
+    // 处理相对或绝对路径
+    if (theme.startsWith('.') || theme.startsWith('/')) {
+      return theme; // 本地主题，不需要安装
     }
 
-    // 如果是单引号包裹的字符串，先移除单引号然后处理转义字符
-    if (markdownString.startsWith("'") && markdownString.endsWith("'")) {
-      markdownString = markdownString.substring(1, markdownString.length - 1);
+    // 处理完整包名
+    if (theme.startsWith('@')) {
+      return theme; // 作用域包，保持原样
     }
 
-    // 直接替换常见的转义字符
-    return markdownString
-      .replace(/\\n/g, '\n')
-      .replace(/\\t/g, '\t')
-      .replace(/\\"/g, '"')
-      .replace(/\\'/g, "'")
-      .replace(/\\\\/g, '\\');
+    // 处理省略前缀的官方主题
+    if (!theme.includes('slidev-theme-') && !theme.startsWith('@slidev/theme-')) {
+      return `@slidev/theme-${theme}`;
+    }
+
+    // 处理社区主题
+    if (!theme.includes('slidev-theme-') && !theme.startsWith('@')) {
+      return `slidev-theme-${theme}`;
+    }
+
+    return theme;
+  }
+
+  /**
+   * 创建工作目录路径
+   * @param requestId 请求ID
+   */
+  private createWorkDir(requestId: string): string {
+    return path.join(this.clientDir, this.tempDir, requestId);
+  }
+
+  /**
+   * 创建并写入Markdown文件
+   * @param workDir 工作目录
+   * @param filename 文件名
+   * @param markdown Markdown内容
+   */
+  private async createMarkdownFile(workDir: string, filename: string, markdown: string): Promise<string> {
+    const slidesFile = path.join(workDir, `${filename}.md`);
+    const parsedMarkdown = parseMarkdownString(markdown);
+    await writeFilePromise(slidesFile, parsedMarkdown);
+    console.log(`Markdown内容已写入: ${slidesFile}`);
+    return slidesFile;
+  }
+
+  /**
+   * 格式化Markdown文件
+   * @param slidesFilePath Markdown文件路径
+   */
+  private async formatMarkdownFile(slidesFilePath: string): Promise<void> {
+    await execPromise(`npx slidev format "${slidesFilePath}"`);
+  }
+
+  /**
+   * 根据导出格式获取文件扩展名
+   * @param format 导出格式
+   */
+  private getFileExtension(format: string): string {
+    const extMap = {
+      'pptx': 'pptx',
+      'pdf': 'pdf',
+      'png': 'png',
+      'markdown': 'md',
+    };
+    return extMap[format] || format;
+  }
+
+  /**
+   * 获取导出参数
+   * @param params 请求参数
+   */
+  private getExportParams(params: RequestParams): string {
+    const { export_format, theme, with_toc, omit_background, with_clicks, dark_mode } = params;
+    const exportParams = [];
+
+    // 导出格式
+    if (export_format) {
+      exportParams.push(`--format ${export_format}`);
+    }
+
+    // 暗黑模式
+    if (dark_mode) {
+      exportParams.push('--dark');
+    }
+
+    // PDF导出特殊参数
+    if (export_format === 'pdf' && with_toc) {
+      exportParams.push('--with-toc');
+    }
+
+    // PNG导出特殊参数
+    if (export_format === 'png' && omit_background) {
+      exportParams.push('--omit-background');
+    }
+
+    // PPTX导出特殊参数
+    if (export_format === 'pptx' && with_clicks) {
+      exportParams.push('--with-clicks');
+    }
+
+    // 设置主题
+    if (theme) {
+      exportParams.push(`--theme ${theme}`);
+    }
+
+    return exportParams.join(' ');
+  }
+
+  /**
+   * 导出演示文稿
+   * @param slidesFilePath Markdown文件路径
+   * @param workDir 工作目录
+   * @param filename 文件名
+   * @param params 请求参数
+   */
+  private async exportPresentation(
+    slidesFilePath: string,
+    workDir: string,
+    filename: string,
+    params: RequestParams
+  ): Promise<string> {
+    const { export_format } = params;
+    const ext = this.getFileExtension(export_format);
+
+    // PNG和MD格式特殊处理（slidev将图片导出为目录）
+    const outputPath = ['png', 'md'].includes(export_format)
+      ? path.join(workDir, filename)
+      : path.join(workDir, `${filename}.${ext}`);
+
+    const exportParams = this.getExportParams(params);
+    console.log(`导出参数: ${exportParams}`);
+
+    try {
+      const { stderr } = await execPromise(
+        `npx slidev export "${slidesFilePath}" ${exportParams} --output "${outputPath}"`,
+        { cwd: this.clientDir }
+      );
+
+      if (stderr) console.error(`导出错误: ${stderr}`);
+      console.log(`文件导出成功: ${outputPath}`);
+
+      return outputPath;
+    } catch (execError) {
+      console.error(`执行导出命令失败:`, execError);
+      throw new Error(`执行导出命令失败: ${execError.message}`);
+    }
+  }
+
+  /**
+   * 读取导出结果
+   * @param outputPath 输出路径
+   * @param workDir 工作目录
+   * @param filename 文件名
+   * @param format 导出格式
+   */
+  private async readExportResult(
+    outputPath: string,
+    workDir: string,
+    filename: string,
+    format: string
+  ): Promise<Buffer> {
+    if (format === 'png') {
+      // PNG格式需要压缩为zip包
+      const zipFile = path.join(workDir, `${filename}.zip`);
+      return await ZipUtil.compressDirectory(outputPath, zipFile);
+    } else if (format === 'md') {
+      // Markdown格式需要压缩整个工作目录
+      const zipFile = path.join(workDir, `${filename}.zip`);
+      return await ZipUtil.compressDirectory(workDir, zipFile);
+    } else {
+      // 其他格式直接读取文件
+      return await readFilePromise(outputPath);
+    }
   }
 }
