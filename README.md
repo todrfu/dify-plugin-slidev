@@ -1,12 +1,12 @@
 # Slidev for Dify
 
-一个基于 [Slidev](https://cn.sli.dev/guide/) 的 Dify 平台插件，可以将 Markdown 内容一键转换为 PPT 演示文稿。
+一个基于 [Slidev](https://cn.sli.dev/guide/) 的 Dify 平台插件，可以将符合slidev要求的Markdown内容一键转换为 PPT 演示文稿。
 
 ![demo](./demo.gif)
 
 ## 项目概述
 
-本项目为 Dify 平台开发的插件，提供了将 Markdown 格式内容转换为专业 PPT 演示文稿的功能。用户可以轻松地在 Dify 对话中生成和下载 PPTX 格式的演示文稿。
+将符合slidev要求的Markdown内容转换为专业 PPT 演示文稿的功能。用户可以轻松地在 Dify 对话中生成和下载 PPTX、PDF、PNG、MD 格式的文件。
 
 ## 项目结构
 
@@ -34,9 +34,9 @@
 
 1. 进入 slidev-py 目录
 2. 安装依赖：`pip install -r requirements.txt`
-3. 配置 .env 文件（参考 .env.example）
+3. 配置 .env 文件（参考 .env.example），[修改REMOTE_INSTALL_KEY](https://docs.dify.ai/zh-hans/plugins/quick-start/debug-plugin)
 4. 启动插件：`python -m main`
-5. 在 Dify 平台导入插件
+5. 查看 Dify 插件列表是否成功
 
 ## 使用方法
 
